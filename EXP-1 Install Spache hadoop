@@ -1,0 +1,6 @@
+22 export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+23 export PATH=$JAVA_HOME/bin:$PATH
+
+25 export HADOOP_HOME=/usr/local/hadoop
+26 export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+27 export PATH=$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH
