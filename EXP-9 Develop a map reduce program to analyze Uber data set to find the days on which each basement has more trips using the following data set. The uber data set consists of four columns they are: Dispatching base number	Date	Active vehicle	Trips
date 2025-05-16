@@ -1,0 +1,79 @@
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class UberTripsAnalysis {
+    
+    public static class UberMapper extends Mapper<Object, Text, Text, Text> {
+        private Text baseId = new Text();
+        private Text dateAndTrips = new Text();
+
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            String[] tokens = value.toString().split("\\s+");  // Split by spaces
+
+            if (tokens.length == 4) {  // Ensure the correct number of columns
+                String base = tokens[0];      // Base ID
+                String date = tokens[1];      // Date
+                String trips = tokens[3];     // Number of trips
+
+                baseId.set(base);
+                dateAndTrips.set(date + "," + trips);
+                context.write(baseId, dateAndTrips);
+            }
+        }
+    }
+
+    public static class UberReducer extends Reducer<Text, Text, Text, Text> {
+        private Text maxTripDate = new Text();
+
+        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            int maxTripsValue = Integer.MIN_VALUE;
+            String maxDay = "";
+
+            for (Text val : values) {
+                String[] parts = val.toString().split(",");
+                String date = parts[0];
+                int trips = Integer.parseInt(parts[1]);
+
+                if (trips > maxTripsValue) {
+                    maxTripsValue = trips;
+                    maxDay = date;
+                }
+            }
+
+            maxTripDate.set(maxDay + " " + maxTripsValue);
+            context.write(key, maxTripDate);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        if (args.length < 2) {
+            System.err.println("Usage: UberTripsAnalysis <input file> <output dir>");
+            System.exit(1);
+        }
+
+        Configuration conf = new Configuration();
+        Job job = Job.getInstance(conf, "Uber Trips Analysis");
+
+        job.setJarByClass(UberTripsAnalysis.class);
+        job.setMapperClass(UberMapper.class);
+        job.setReducerClass(UberReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(Text.class);
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(Text.class);
+
+        FileInputFormat.addInputPath(job, new Path(args[0]));  // Takes file directly
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+}
