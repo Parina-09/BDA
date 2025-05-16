@@ -1,0 +1,59 @@
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class MovieTagsAnalysis {
+
+    public static class TagsMapper extends Mapper<Object, Text, Text, Text> {
+        private Text movieID = new Text();
+        private Text tag = new Text();
+
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            String[] fields = value.toString().split(",");
+            if (fields.length >= 3) {  // Ensuring proper data format
+                movieID.set(fields[1]);  // Movie ID is in the second column
+                tag.set(fields[2]);  // Tag is in the third column
+                context.write(movieID, tag);
+            }
+        }
+    }
+
+    public static class TagsReducer extends Reducer<Text, Text, Text, Text> {
+        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            List<String> tagsList = new ArrayList<>();
+            for (Text val : values) {
+                tagsList.add(val.toString());
+            }
+            context.write(key, new Text(String.join(", ", tagsList)));
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
+        Job job = Job.getInstance(conf, "Movie Tags Analysis");
+
+        job.setJarByClass(MovieTagsAnalysis.class);
+        job.setMapperClass(TagsMapper.class);
+        job.setReducerClass(TagsReducer.class);
+
+
+
+
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(Text.class);
+
+        FileInputFormat.addInputPath(job, new Path(args[0])); // Input directory (tags.csv)
+        FileOutputFormat.setOutputPath(job, new Path(args[1])); // Output directory
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+}
